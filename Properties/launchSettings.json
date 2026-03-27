@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "pwnasm": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Virtual\\code.asm\" -elf64"
+    }
+  }
+}

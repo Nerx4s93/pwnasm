@@ -5,7 +5,6 @@ using System.Linq;
 
 namespace pwnasm;
 
-
 class Program
 {
     static void Main(string[] args)
@@ -13,22 +12,33 @@ class Program
         if (args.Length == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Usege: pwnasm <file.asm>");
+            Console.WriteLine("Usage: pwnasm <file.asm> [-elf64]");
             Console.ResetColor();
             return;
         }
 
-        Directory.CreateDirectory("temp");
-
         var asmFile = args[0];
+        var isElf = args.Contains("-elf64");
+
+        if (isElf)
+        {
+            BuildElfViaWsl(asmFile);
+        }
+        else
+        {
+            BuildShellcode(asmFile);
+        }
+    }
+
+    static void BuildShellcode(string asmFile)
+    {
+        Directory.CreateDirectory("temp");
         var binFile = Path.Combine("temp", Path.ChangeExtension(Path.GetFileName(asmFile), ".bin"));
         var nasmPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nasm.exe");
 
         if (!File.Exists(nasmPath))
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("nasm.exe not founded");
-            Console.ResetColor();
+            Error("nasm.exe not found in app directory");
             return;
         }
 
@@ -43,11 +53,10 @@ class Program
 
         using var process = Process.Start(startInfo);
         process!.WaitForExit();
+
         if (process.ExitCode != 0)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(process.StandardError.ReadToEnd());
-            Console.ResetColor();
+            Error(process.StandardError.ReadToEnd());
             return;
         }
 
@@ -61,8 +70,51 @@ class Program
             Console.WriteLine(hex);
             Console.ResetColor();
             Console.WriteLine();
+            File.Delete(binFile);
         }
+    }
 
-        File.Delete(binFile);
+    static void BuildElfViaWsl(string asmFile)
+    {
+        var fullPath = Path.GetFullPath(asmFile);
+        var dir = Path.GetDirectoryName(fullPath);
+        var file = Path.GetFileName(fullPath);
+        var nameNoExt = Path.GetFileNameWithoutExtension(fullPath);
+
+        var wslCmd = $"cd \"$(wslpath -u '{dir}')\" &&" +
+                     $"nasm -f elf64 \"{file}\" -o \"{nameNoExt}.o\" &&" +
+                     $"ld \"{nameNoExt}.o\" -o \"{nameNoExt}.elf\" && rm \"{nameNoExt}.o\"";
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "wsl",
+            Arguments = $"sh -c \"{wslCmd}\"",
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        Console.WriteLine($"[*] Building ELF64 for {file} via WSL...");
+
+        using var process = Process.Start(startInfo);
+        process!.WaitForExit();
+
+        if (process.ExitCode == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"[+] Success! Created: {nameNoExt}.elf");
+            Console.ResetColor();
+        }
+        else
+        {
+            Error(process.StandardError.ReadToEnd());
+        }
+    }
+
+    static void Error(string msg)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine(msg);
+        Console.ResetColor();
     }
 }
