@@ -63,8 +63,10 @@ class Program
         if (File.Exists(binFile))
         {
             var shellcode = File.ReadAllBytes(binFile);
+            var bytesCount = shellcode.Length;
             var hex = string.Join("", shellcode.Select(b => $"\\x{b:x2}"));
 
+            Console.WriteLine($"Total bytes: {bytesCount} bytes");
             Console.WriteLine("\nRaw Hex:");
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine(hex);
